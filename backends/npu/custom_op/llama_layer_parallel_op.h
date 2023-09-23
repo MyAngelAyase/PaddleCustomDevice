@@ -40,7 +40,8 @@ public:
 
 private:
   void BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
-                        std::vector<const phi::DenseTensor *> &outTensors);
+                        std::vector<const phi::DenseTensor *> &outTensors,
+                        uint64_t layerId);
   void BindHostTensorForUpdateParam(atb::VariantPack &variantPack);
   atb::Tensor CreateBatchStatusAtbHostTensor();
 
@@ -53,7 +54,7 @@ private:
   int32_t curBatchSize_ = 0;
 };
 
-class PpAtbLlamaEncoderLayerParallelOp : public PpAscendAtbOpBase {
+class PpAtbLlamaEncoderLayerParallelOp : public PpAscendAtbOpBaseAsync {
 public:
   PpAtbLlamaEncoderLayerParallelOp(const std::string &modelName, int32_t layerNum, int32_t curBatchSize);
   ~PpAtbLlamaEncoderLayerParallelOp();
@@ -63,7 +64,8 @@ public:
 
 private:
   void BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
-                        std::vector<const phi::DenseTensor *> &outTensors);
+                        std::vector<const phi::DenseTensor *> &outTensors,
+                        uint64_t layerId);
   void BindHostTensorForUpdateParam(atb::VariantPack &variantPack);
   atb::Tensor CreateBatchStatusAtbHostTensor();
 
