@@ -24,16 +24,18 @@ public:
   ~PpAscendAtbOpBase();
 
   virtual void BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
-                                std::vector<const phi::DenseTensor *> &outTensors);
+                                std::vector<const phi::DenseTensor *> &outTensors,
+                                uint64_t layerId);
   atb::Status Execute(aclrtStream stream,
                       std::vector<const phi::DenseTensor *> &inTensors,
-                      std::vector<const phi::DenseTensor *> &outTensors);
+                      std::vector<const phi::DenseTensor *> &outTensors,
+                      uint64_t layerId);
 
   std::shared_ptr<atb::Operation> operation_;
 
 protected:
   std::string opName_;
-  atb::VariantPack variantPacks_;
+  std::vector<atb::VariantPack> variantPacks_;
 
 private:
   void SetWorkspace(uint64_t workspace_size);
