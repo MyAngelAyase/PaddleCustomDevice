@@ -15,23 +15,26 @@
 #include <acl/acl.h>
 #include "atb_layer_base.h"
 #include "kernels/funcs/format_utils.h"
+#include "runtime/runtime.h"
+#include <iostream>
 
 void PpAscendAtbOpBase::BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
-                                              std::vector<const phi::DenseTensor *> &outTensors)
+                                         std::vector<const phi::DenseTensor *> &outTensors,
+                                         uint64_t layerId)
 {
-  variantPacks_.inTensors.resize(inTensors.size());
+  variantPacks_.at(layerId).inTensors.resize(inTensors.size());
   for (size_t i = 0; i < inTensors.size(); i++) {
-    variantPacks_.inTensors.at(i) = ConvertDenseTensorToAtbTensor(*(inTensors.at(i)));
-    if (variantPacks_.inTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
-      variantPacks_.inTensors.at(i).desc.format = ACL_FORMAT_ND;
+    variantPacks_.at(layerId).inTensors.at(i) = ConvertDenseTensorToAtbTensor(*(inTensors.at(i)));
+    if (variantPacks_.at(layerId).inTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
+      variantPacks_.at(layerId).inTensors.at(i).desc.format = ACL_FORMAT_ND;
     }
   }
 
-  variantPacks_.outTensors.resize(outTensors.size());
+  variantPacks_.at(layerId).outTensors.resize(outTensors.size());
   for (size_t i = 0; i < outTensors.size(); i++) {
-    variantPacks_.outTensors.at(i) = ConvertDenseTensorToAtbTensor(*(outTensors.at(i)));
-    if (variantPacks_.outTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
-      variantPacks_.outTensors.at(i).desc.format = ACL_FORMAT_ND;
+    variantPacks_.at(layerId).outTensors.at(i) = ConvertDenseTensorToAtbTensor(*(outTensors.at(i)));
+    if (variantPacks_.at(layerId).outTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
+      variantPacks_.at(layerId).outTensors.at(i).desc.format = ACL_FORMAT_ND;
     }
   }
 }
@@ -58,13 +61,14 @@ void PpAscendAtbOpBase::SetWorkspace(uint64_t workspace_size)
 
 atb::Status PpAscendAtbOpBase::Execute(aclrtStream stream,
                                      std::vector<const phi::DenseTensor *> &inTensors,
-                                     std::vector<const phi::DenseTensor *> &outTensors)
+                                     std::vector<const phi::DenseTensor *> &outTensors,
+                                     uint64_t layerId)
 {
   uint64_t workspace_size;
   stream_ = stream;
-  BuildVariantPack(inTensors, outTensors);
+  BuildVariantPack(inTensors, outTensors, layerId);
 
-  atb::Status st = operation_->Setup(variantPacks_, workspace_size);
+  atb::Status st = operation_->Setup(variantPacks_.at(layerId), workspace_size);
   PADDLE_ENFORCE_EQ(st,
                     0,
                     phi::errors::External("Atb Layer %s Op Setup failed,"
@@ -73,8 +77,18 @@ atb::Status PpAscendAtbOpBase::Execute(aclrtStream stream,
   if (workspace_size > 0) {
     SetWorkspace(workspace_size);
   }
+  std::cout << "-----layerId: " << layerId << ", AfterSetup" << std::endl;
 
-  st = operation_->Execute(variantPacks_, (uint8_t *)workspace_, workspace_size, stream);
+  HostCallbackManager::Instance().Launch(
+    SecondaryStream::Instance().Get(stream),
+    [=](){
+      std::cout << "-----layerId: " << layerId << ", BeforeExecute" << std::endl;
+      operation_->Execute(variantPacks_.at(layerId), (uint8_t *)workspace_, workspace_size, stream);
+      std::cout << "-----AfterExecute" << std::endl;
+    }
+  );
+
+  // st = operation_->Execute(variantPacks_.at(layerId), (uint8_t *)workspace_, workspace_size, stream);
 
   return st;
 }
@@ -82,6 +96,7 @@ atb::Status PpAscendAtbOpBase::Execute(aclrtStream stream,
 PpAscendAtbOpBase::PpAscendAtbOpBase(const std::string &opName)
 {
   opName_ = opName;
+  variantPacks_.resize(1);
 }
 
 PpAscendAtbOpBase::~PpAscendAtbOpBase() {}

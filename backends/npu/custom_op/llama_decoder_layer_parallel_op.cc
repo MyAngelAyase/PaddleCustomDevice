@@ -95,25 +95,26 @@ void PpAtbLlamaDecoderLayerParallelOp::BindHostTensorForUpdateParam(atb::Variant
 }
 
 void PpAtbLlamaDecoderLayerParallelOp::BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
-                                                        std::vector<const phi::DenseTensor *> &outTensors) {
-  variantPacks_.inTensors.resize(inTensors.size() + 1);
+                                                        std::vector<const phi::DenseTensor *> &outTensors,
+                                                        uint64_t layerId) {
+  variantPacks_.at(layerId).inTensors.resize(inTensors.size() + 1);
   for (size_t i = 0; i < inTensors.size(); i++) {
-    variantPacks_.inTensors.at(i) = ConvertDenseTensorToAtbTensor(*(inTensors.at(i)));
-    if (variantPacks_.inTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
-      variantPacks_.inTensors.at(i).desc.format = ACL_FORMAT_ND;
+    variantPacks_.at(layerId).inTensors.at(i) = ConvertDenseTensorToAtbTensor(*(inTensors.at(i)));
+    if (variantPacks_.at(layerId).inTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
+      variantPacks_.at(layerId).inTensors.at(i).desc.format = ACL_FORMAT_ND;
     }
   }
-  variantPacks_.inTensors.at(inTensors.size()) = CreateBatchStatusAtbHostTensor();
+  variantPacks_.at(layerId).inTensors.at(inTensors.size()) = CreateBatchStatusAtbHostTensor();
 
-  variantPacks_.outTensors.resize(outTensors.size());
+  variantPacks_.at(layerId).outTensors.resize(outTensors.size());
   for (size_t i = 0; i < outTensors.size(); i++) {
-    variantPacks_.outTensors.at(i) = ConvertDenseTensorToAtbTensor(*(outTensors.at(i)));
-    if (variantPacks_.outTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
-      variantPacks_.outTensors.at(i).desc.format = ACL_FORMAT_ND;
+    variantPacks_.at(layerId).outTensors.at(i) = ConvertDenseTensorToAtbTensor(*(outTensors.at(i)));
+    if (variantPacks_.at(layerId).outTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
+      variantPacks_.at(layerId).outTensors.at(i).desc.format = ACL_FORMAT_ND;
     }
   }
   // param需要更新，依赖这种方式
-  BindHostTensorForUpdateParam(variantPacks_);
+  BindHostTensorForUpdateParam(variantPacks_.at(layerId));
 }
 
 bool PpAtbLlamaDecoderLayerParallelOp::BatchSizeChanged(int32_t batchSize) {
@@ -159,6 +160,7 @@ PpAtbLlamaDecoderLayerParallelOp::PpAtbLlamaDecoderLayerParallelOp(
   layerNum_ = layerNum;
   curBatchSize_ = batch_size;
   maxBatchSize_ = maxBatchSize;
+  variantPacks_.resize(layerNum_);
 
   /* qLen增量阶段始终为1 */
   std::vector<int32_t> q_seq_len_vec;
@@ -259,11 +261,12 @@ std::vector<paddle::Tensor> LlamaDecoderLayerParallelOp(
   dev_ctx->Alloc(layerout_tensor.get(),
       static_cast<const phi::DenseTensor *>(hidden.impl().get())->dtype());
   std::vector<const phi::DenseTensor *> outputs = {layerout_tensor.get()};
-  g_llamaDecoderLayerParallelOp->Execute(stream, inputs, outputs);
+  g_llamaDecoderLayerParallelOp->Execute(stream, inputs, outputs, executeCount);
 
   executeCount++;
   if ((executeCount) % layer_num == 0) {
     aclrtSynchronizeStream(stream);
+    executeCount = 0;
   }
 
   return {paddle::Tensor(layerout_tensor), cache_key_value}; // TODO:待确认past_key返回

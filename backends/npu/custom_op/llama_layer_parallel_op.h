@@ -40,7 +40,8 @@ public:
 
 private:
   void BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
-                        std::vector<const phi::DenseTensor *> &outTensors);
+                        std::vector<const phi::DenseTensor *> &outTensors,
+                        uint64_t layerId);
   void BindHostTensorForUpdateParam(atb::VariantPack &variantPack);
   atb::Tensor CreateBatchStatusAtbHostTensor();
 
@@ -64,7 +65,8 @@ public:
 
 private:
   void BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
-                        std::vector<const phi::DenseTensor *> &outTensors);
+                        std::vector<const phi::DenseTensor *> &outTensors,
+                        uint64_t layerId);
   void BindHostTensorForUpdateParam(atb::VariantPack &variantPack);
   atb::Tensor CreateBatchStatusAtbHostTensor();
 
