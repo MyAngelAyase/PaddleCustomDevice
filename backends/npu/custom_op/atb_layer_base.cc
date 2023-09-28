@@ -16,6 +16,7 @@
 #include "atb_layer_base.h"
 #include "kernels/funcs/format_utils.h"
 #include "runtime/runtime.h"
+#include <iostream>
 
 void PpAscendAtbOpBase::BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
                                          std::vector<const phi::DenseTensor *> &outTensors,
@@ -76,11 +77,14 @@ atb::Status PpAscendAtbOpBase::Execute(aclrtStream stream,
   if (workspace_size > 0) {
     SetWorkspace(workspace_size);
   }
+  std::cout << "-----layerId: " << layerId << ", AfterSetup" << std::endl;
 
   HostCallbackManager::Instance().Launch(
     SecondaryStream::Instance().Get(stream),
     [=](){
+      std::cout << "-----layerId: " << layerId << ", BeforeExecute" << std::endl;
       operation_->Execute(variantPacks_.at(layerId), (uint8_t *)workspace_, workspace_size, stream);
+      std::cout << "-----AfterExecute" << std::endl;
     }
   );
 

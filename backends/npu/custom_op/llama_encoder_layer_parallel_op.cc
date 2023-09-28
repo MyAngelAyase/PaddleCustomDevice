@@ -119,6 +119,7 @@ void PpAtbLlamaEncoderLayerParallelOp::BuildVariantPack(std::vector<const phi::D
   }
   // param需要更新，依赖这种方式
   BindHostTensorForUpdateParam(variantPacks_.at(layerId));
+  std::cout << "-----layerId: " << layerId << ", AfterBuildVariantPack" << std::endl;
 }
 
 void PpAtbLlamaEncoderLayerParallelOp::UpdateInputTensorAndParam(const paddle::Tensor &seq_len)
