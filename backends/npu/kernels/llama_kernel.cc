@@ -127,7 +127,7 @@ PD_REGISTER_PLUGIN_KERNEL(rms_norm,
                           float,
                           double,
                           int64_t,
-						              phi::dtype::float16,
+                          phi::dtype::float16,
                           phi::dtype::bfloat16) {}
 
 PD_REGISTER_PLUGIN_KERNEL(variable_length_memory_efficient_attention,
@@ -137,7 +137,7 @@ PD_REGISTER_PLUGIN_KERNEL(variable_length_memory_efficient_attention,
                           float,
                           double,
                           int64_t,
-						              phi::dtype::float16,
+                          phi::dtype::float16,
                           phi::dtype::bfloat16) {
   kernel->InputAt(3).SetDataType(phi::DataType::INT32);
 }
@@ -149,8 +149,8 @@ PD_REGISTER_PLUGIN_KERNEL(fused_bias_act,
                           float,
                           double,
                           int64_t,
-						              int32_t,
-						              phi::dtype::float16,
+                          int32_t,
+                          phi::dtype::float16,
                           phi::dtype::bfloat16) {}
 						  
 PD_REGISTER_PLUGIN_KERNEL(fused_bias_residual_layernorm,
@@ -160,8 +160,8 @@ PD_REGISTER_PLUGIN_KERNEL(fused_bias_residual_layernorm,
                           float,
                           double,
                           int64_t,
-						              int32_t,
-						              phi::dtype::float16,
+                          int32_t,
+                          phi::dtype::float16,
                           phi::dtype::bfloat16) {}
 
 PD_REGISTER_PLUGIN_KERNEL(masked_multihead_attention,
