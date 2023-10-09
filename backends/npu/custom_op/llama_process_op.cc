@@ -43,9 +43,9 @@ std::vector<std::vector<int64_t>> QKVTransposeSplitInferShape(const std::vector<
 }
 
 std::vector<paddle::DataType> QKVTransposeSplitInferDtype(const paddle::DataType& qkv_dtype,
-                                                        const paddle::DataType& padding_offset_dtype,
-                                                        const paddle::DataType& seq_lens_dtype,
-                                                        const paddle::DataType& input_ids_dtype) {
+                                                          const paddle::DataType& padding_offset_dtype,
+                                                          const paddle::DataType& seq_lens_dtype,
+                                                          const paddle::DataType& input_ids_dtype) {
     return {qkv_dtype, qkv_dtype, qkv_dtype};
 }
 
@@ -63,16 +63,16 @@ std::vector<std::vector<int64_t>> WriteCacheKvOpInferShape(
     const std::vector<int64_t>& cache_kv_shape,
     const std::vector<int64_t>& input_k_shape,
     const std::vector<int64_t>& input_v_shape,
-	const std::vector<int64_t>& sequence_lengths_shape) {
+    const std::vector<int64_t>& sequence_lengths_shape) {
 
   std::vector<int64_t> out_shape = cache_kv_shape;
   return {out_shape};
 }
 
 std::vector<paddle::DataType> WriteCacheKvOpInferDtype(const paddle::DataType& input_ids_dtype,
-                                                            const paddle::DataType& padding_offset_dtype,
-                                                            const paddle::DataType& qkv_dtype,
-                                                            const paddle::DataType& seq_len_dtype) {
+                                                       const paddle::DataType& padding_offset_dtype,
+                                                       const paddle::DataType& qkv_dtype,
+                                                       const paddle::DataType& seq_len_dtype) {
     return {input_ids_dtype};
 }
 
@@ -125,7 +125,7 @@ std::vector<std::vector<int64_t>> VariablAttOpInferShape(
     const std::vector<int64_t>& key_shape,
     const std::vector<int64_t>& kv_seq_lens_shape,
     const std::vector<int64_t>& mask_shape,
-	  const std::vector<int64_t>& query_shape,
+    const std::vector<int64_t>& query_shape,
     const std::vector<int64_t>& seq_lens_shape,
     const std::vector<int64_t>& value_shape) {
 
@@ -137,7 +137,7 @@ std::vector<paddle::Tensor> VariablAttOp(
     const paddle::Tensor& key,
     const paddle::Tensor& kv_seq_lens,
     const paddle::Tensor& mask,
-	  const paddle::Tensor& query,
+    const paddle::Tensor& query,
     const paddle::Tensor& seq_lens,
     const paddle::Tensor& value) {
 
@@ -149,7 +149,7 @@ std::vector<paddle::Tensor> VariablAttOp(
 PD_BUILD_OP(variable_length_memory_efficient_attention)
     .Inputs({"key", "kv_seq_lens", "mask", "query", "seq_lens", "value"})
     .Outputs({"out"})
-	  .Attrs({"causal: bool"})
+    .Attrs({"causal: bool"})
     .SetKernelFn(PD_KERNEL(VariablAttOp))
     .SetInferShapeFn(PD_INFER_SHAPE(
         VariablAttOpInferShape));  // neccessary if the op has muti_inputs
@@ -205,8 +205,8 @@ std::vector<std::vector<int64_t>> SetMaskValueInferShape(const std::vector<int64
 
 std::vector<paddle::DataType> SetMaskValueInferDtype(
     const paddle::DataType& input_data_dtype,
-	const paddle::DataType& stop_flags_dtype,
-	const paddle::DataType& seq_lens_dtype) {
+    const paddle::DataType& stop_flags_dtype,
+    const paddle::DataType& seq_lens_dtype) {
   return {seq_lens_dtype};
 }
 
@@ -220,8 +220,8 @@ PD_BUILD_OP(set_mask_value)
 // set_value_by_flags_and_idx
 std::vector<paddle::Tensor> SetValueByFlagsAndIdx(const paddle::Tensor& pre_ids_all,
                                                   const paddle::Tensor& pre_ids_now, 
-												  const paddle::Tensor& step_idx, 
-												  const paddle::Tensor& stop_flags) {
+                                                  const paddle::Tensor& step_idx, 
+                                                  const paddle::Tensor& stop_flags) {
   auto dev_ctx = static_cast<const phi::CustomContext*>(
       paddle::experimental::DeviceContextPool::Instance().Get(stop_flags.place()));
   auto stream = static_cast<aclrtStream>(dev_ctx->stream());
@@ -246,7 +246,7 @@ std::vector<paddle::Tensor> SetValueByFlagsAndIdx(const paddle::Tensor& pre_ids_
 std::vector<std::vector<int64_t>> SetValueByFlagsAndIdxInferShape(const std::vector<int64_t>& pre_ids_all_shape, 
                                                                   const std::vector<int64_t>& pre_ids_now_shape,
                                                                   const std::vector<int64_t>& step_idx_shape, 
-																  const std::vector<int64_t>& stop_flags_shape) {
+                                                                  const std::vector<int64_t>& stop_flags_shape) {
   return {stop_flags_shape};
 }
 
@@ -267,8 +267,8 @@ PD_BUILD_OP(set_value_by_flags_and_idx)
 // set_stop_value_multi_ends
 std::vector<paddle::Tensor> GetStopFlagsMulti(const paddle::Tensor& topk_ids, 
                                               const paddle::Tensor& stop_flags, 
-											  const paddle::Tensor& end_ids, 
-											  int64_t mode) {
+                                              const paddle::Tensor& end_ids, 
+                                              int64_t mode) {
   auto dev_ctx = static_cast<const phi::CustomContext*>(
       paddle::experimental::DeviceContextPool::Instance().Get(end_ids.place()));
   auto stream = static_cast<aclrtStream>(dev_ctx->stream());
@@ -307,7 +307,7 @@ std::vector<std::vector<int64_t>> GetStopFlagsMultiInferShape(const std::vector<
 
 std::vector<paddle::DataType> GetStopFlagsMultiInferDtype(const paddle::DataType& topk_ids_dtype, 
                                                           const paddle::DataType& stop_flags_dtype, 
-														  const paddle::DataType& end_ids_dtype) {
+                                                          const paddle::DataType& end_ids_dtype) {
   return {topk_ids_dtype, stop_flags_dtype};
 }
 
@@ -576,7 +576,7 @@ PD_BUILD_OP(get_token_penalty_multi_scores)
 // top_p_sampling
 std::vector<paddle::Tensor> TopPSampling(const paddle::Tensor& x, 
                                          const paddle::Tensor& top_ps, 
-										 int random_seed) {
+                                         int random_seed) {
     std::vector<int64_t> shape = x.shape();
   int bs = shape[0];
   auto topp_ids = paddle::full({bs, 1}, 1, paddle::DataType::INT64, x.place());
