@@ -44,4 +44,56 @@ private:
   uint64_t workspaceSize_ = 0;
   int32_t currentDevId_ = 0;
 };
+
+#include <atomic>
+#include <thread>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+
+
+class PpAscendAtbOpBaseAsync {
+public:
+  PpAscendAtbOpBaseAsync(const std::string &opName);
+  ~PpAscendAtbOpBaseAsync();
+
+  virtual void BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
+                                std::vector<const phi::DenseTensor *> &outTensors,
+                                uint64_t layerId);
+                                
+  void Setup(aclrtStream stream,
+             std::vector<const phi::DenseTensor *> &inTensors,
+             std::vector<const phi::DenseTensor *> &outTensors,
+             uint64_t layerId);
+
+  void Execute(aclrtStream stream, uint64_t layerId);
+  void ThreadProcessTask();
+  void PushTask(int layerId);
+  int PopTask();
+  void ExecutePlan(int layerId);
+
+  std::shared_ptr<atb::Operation> operation_;
+
+protected:
+  std::string opName_;
+  std::vector<atb::VariantPack> variantPacks_;
+  std::thread taskProcessThread_;
+  std::queue<int> taskQueue_;
+  std::atomic_int layerCount_;
+  std::mutex mutex_;
+  std::condition_variable cond_;
+
+private:
+  void SetWorkspace(uint64_t workspace_size);
+
+private:
+  uint64_t workspaceSize_ = 0;
+  void *workspace_ = nullptr;
+
+   int32_t currentDevId_ = 0;
+   int32_t layerNum_ = 0;
+
+  aclrtStream stream_;
+
+};
 #endif
