@@ -88,6 +88,8 @@ atb::Status PpAscendAtbOpBase::Execute(aclrtStream stream,
     }
   );
 
+  aclrtSynchronizeStream(SecondaryStream::Instance().Get(stream));
+
   // st = operation_->Execute(variantPacks_.at(layerId), (uint8_t *)workspace_, workspace_size, stream);
 
   return st;
