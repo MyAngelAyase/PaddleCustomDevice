@@ -28,7 +28,7 @@ ccl::CCLComm GetCCLComm(const Place& place, int global_gid);
 
 #define ATB_FLASH_ATTENTION_MAX_SEQ_LEN 1024
 
-class PpAtbLlamaDecoderLayerParallelOp : public PpAscendAtbOpBase {
+class PpAtbLlamaDecoderLayerParallelOp : public PpAscendAtbOpBaseAsync {
 public:
   PpAtbLlamaDecoderLayerParallelOp(const std::string &modelName, int32_t layerNum, int32_t batchSize, int maxBatchSize, const phi::CustomContext &dev_ctx);
   ~PpAtbLlamaDecoderLayerParallelOp();
@@ -40,7 +40,8 @@ public:
 
 private:
   void BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
-                        std::vector<const phi::DenseTensor *> &outTensors);
+                        std::vector<const phi::DenseTensor *> &outTensors,
+                        uint64_t layerId);
   void BindHostTensorForUpdateParam(atb::VariantPack &variantPack);
   atb::Tensor CreateBatchStatusAtbHostTensor();
 
@@ -49,12 +50,12 @@ private:
   std::vector<int32_t> q_seq_len_param_;
   std::vector<int32_t> batch_status_param_;
 
-  int32_t layerNum_ = 0;
+  // int32_t layerNum_ = 0;
   int32_t curBatchSize_ = 0;
   int32_t maxBatchSize_ = 0;
 };
 
-class PpAtbLlamaEncoderLayerParallelOp : public PpAscendAtbOpBase {
+class PpAtbLlamaEncoderLayerParallelOp : public PpAscendAtbOpBaseAsync {
 public:
   PpAtbLlamaEncoderLayerParallelOp(const std::string &modelName, int32_t layerNum, int32_t batchSize, int maxBatchSize);
   ~PpAtbLlamaEncoderLayerParallelOp();
@@ -64,7 +65,8 @@ public:
 
 private:
   void BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
-                        std::vector<const phi::DenseTensor *> &outTensors);
+                        std::vector<const phi::DenseTensor *> &outTensors,
+                        uint64_t layerId);
   void BindHostTensorForUpdateParam(atb::VariantPack &variantPack);
   atb::Tensor CreateBatchStatusAtbHostTensor();
 
@@ -73,7 +75,7 @@ private:
   std::vector<int32_t> q_seq_len_param_;
   std::vector<int32_t> batch_status_param_;
 
-  int32_t layerNum_ = 0;
+  // int32_t layerNum_ = 0;
   int32_t curBatchSize_ = 0;
   int32_t maxBatchSize_ = 0;
 };

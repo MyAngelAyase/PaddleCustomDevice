@@ -90,4 +90,138 @@ PpAscendAtbOpBase::PpAscendAtbOpBase(const std::string &opName)
 }
 
 PpAscendAtbOpBase::~PpAscendAtbOpBase() {}
+
+
+
+
+void PpAscendAtbOpBaseAsync::BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
+                                              std::vector<const phi::DenseTensor *> &outTensors,
+                                              uint64_t layerId)
+{
+  variantPacks_.at(layerId).inTensors.resize(inTensors.size());
+  for (size_t i = 0; i < inTensors.size(); i++) {
+    variantPacks_.at(layerId).inTensors.at(i) = ConvertDenseTensorToAtbTensor(*(inTensors.at(i)));
+    if (variantPacks_.at(layerId).inTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
+      variantPacks_.at(layerId).inTensors.at(i).desc.format = ACL_FORMAT_ND;
+    }
+  }
+
+  variantPacks_.at(layerId).outTensors.resize(outTensors.size());
+  for (size_t i = 0; i < outTensors.size(); i++) {
+    variantPacks_.at(layerId).outTensors.at(i) = ConvertDenseTensorToAtbTensor(*(outTensors.at(i)));
+    if (variantPacks_.at(layerId).outTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
+      variantPacks_.at(layerId).outTensors.at(i).desc.format = ACL_FORMAT_ND;
+    }
+  }
+}
+
+void PpAscendAtbOpBaseAsync::SetWorkspace(uint64_t workspace_size)
+{
+  if (workspace_size <= workspaceSize_) {
+    return;
+  }
+
+  if (workspace_) {
+    aclrtFree(workspace_);
+    workspace_ = nullptr;
+    workspaceSize_ = 0;
+  }
+  int st = aclrtMalloc((void **)&workspace_, workspace_size, ACL_MEM_MALLOC_HUGE_FIRST);
+  PADDLE_ENFORCE_EQ(st,
+                    0,
+                    phi::errors::External("AtbAsync layer %s SetWorkspace MemMallocDevice,"
+                            "fail, ret: %d size %llu.", opName_, st, workspace_size));
+
+  workspaceSize_ = workspace_size;
+}
+
+atb::Status PpAscendAtbOpBaseAsync::Setup(aclrtStream stream,
+                                          std::vector<const phi::DenseTensor *> &inTensors,
+                                          std::vector<const phi::DenseTensor *> &outTensors,
+                                          uint64_t layerId)
+{
+  uint64_t workspace_size;
+  stream_ = stream;
+  BuildVariantPack(inTensors, outTensors, layerId);
+
+  if (context_ == nullptr) {
+    atb::CreateContext(&context_);
+    context_->SetExecuteStream(stream);
+  }
+
+  atb::Status st = operations_.at(layerId)->Setup(variantPacks_.at(layerId), workspace_size);
+  PADDLE_ENFORCE_EQ(st,
+                    0,
+                    phi::errors::External("AtbAsync Layer %s Op Setup failed,"
+                                          "ret message: %d .", opName_, st));
+
+  if (workspace_size > 0) {
+    SetWorkspace(workspace_size);
+  }
+  PushTask(layerId);
+
+  return st;
+}
+
+atb::Status PpAscendAtbOpBaseAsync::Execute(uint64_t layerId)
+{
+  atb::Status st = operations_.at(layerId)->Execute(variantPacks_.at(layerId), (uint8_t *)workspace_, workspaceSize_, context_);
+  PADDLE_ENFORCE_EQ(st,
+                    0,
+                    phi::errors::External("AtbAsync Layer %dth Execute failed,"
+                                          "ret message: %s .", layerId, st));
+
+  return st;
+}
+
+void PpAscendAtbOpBaseAsync::PushTask(int layerId)
+{
+  std::unique_lock<std::mutex> lock(mutex_);
+  taskQueue_.push(layerId);
+  lock.unlock();
+  cond_.notify_one();
+}
+
+int PpAscendAtbOpBaseAsync::PopTask()
+{
+  std::unique_lock<std::mutex> lock(mutex_);
+  while (taskQueue_.empty()) {
+      cond_.wait(lock);
+  }
+  int layerId = taskQueue_.front();
+  taskQueue_.pop();
+  return layerId;
+}
+
+void PpAscendAtbOpBaseAsync::ThreadProcessTask()
+{
+  // ATB_LOG(FATAL) << "PpAscendAtbOpBaseAsync ThreadProcessTask start";
+
+  int ret = aclrtSetDevice(currentDevId_);
+  PADDLE_ENFORCE_EQ(ret,
+                    0,
+                    phi::errors::External("AtbAsync Layer %s Op SetDevice failed,"
+                                          "ret message: %d .", opName_, ret));
+
+  int processTaskCount = 0;
+  while (true) {
+    int layerId = PopTask();
+
+    atb::Status st = Execute(layerId);
+
+    processTaskCount++;
+    if (processTaskCount == layerNum_) {
+        // ATB_LOG(INFO) << "PpAscendAtbOpBaseAsync thread process all layers";
+        processTaskCount = 0;
+        allTaskFinish_ = true;
+    }
+  }
+}
+
+PpAscendAtbOpBaseAsync::PpAscendAtbOpBaseAsync(const std::string &opName)
+{
+  opName_ = opName;
+}
+
+PpAscendAtbOpBaseAsync::~PpAscendAtbOpBaseAsync() {}
 #endif

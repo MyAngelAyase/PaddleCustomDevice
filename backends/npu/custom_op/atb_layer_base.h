@@ -14,6 +14,12 @@
 
 #pragma once
 #ifdef PADDLE_WITH_ASCEND_TRANSFORMER_ACC
+#include <atomic>
+#include <thread>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+
 #include <acl/acl.h>
 #include "atb/atb_infer.h"
 #include "paddle/extension.h"
@@ -43,5 +49,45 @@ protected:
 private:
   uint64_t workspaceSize_ = 0;
   int32_t currentDevId_ = 0;
+};
+
+class PpAscendAtbOpBaseAsync {
+public:
+  PpAscendAtbOpBaseAsync(const std::string &opName);
+  ~PpAscendAtbOpBaseAsync();
+
+  virtual void BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
+                                std::vector<const phi::DenseTensor *> &outTensors,
+                                uint64_t layerId);
+                                
+  virtual atb::Status Setup(aclrtStream stream,
+                            std::vector<const phi::DenseTensor *> &inTensors,
+                            std::vector<const phi::DenseTensor *> &outTensors,
+                            uint64_t layerId);
+
+  virtual atb::Status Execute(uint64_t layerId);
+  void ThreadProcessTask();
+  void PushTask(int layerId);
+  int PopTask();
+
+  std::vector<std::shared_ptr<atb::Operation>> operations_;
+  int32_t currentDevId_ = 0;
+  std::atomic_bool allTaskFinish_;
+
+protected:
+  std::string opName_;
+  std::vector<atb::VariantPack> variantPacks_;
+  atb::Context *context_ = nullptr;
+  aclrtStream stream_;
+  std::thread taskProcessThread_;
+  std::queue<int> taskQueue_;
+  std::mutex mutex_;
+  std::condition_variable cond_;
+  int32_t layerNum_ = 0;
+  void *workspace_ = nullptr;
+  void SetWorkspace(uint64_t workspace_size);
+
+private:
+  uint64_t workspaceSize_ = 0;
 };
 #endif
