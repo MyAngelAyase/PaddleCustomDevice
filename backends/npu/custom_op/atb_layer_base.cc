@@ -22,7 +22,7 @@ void PpAscendAtbOpBase::BuildVariantPack(std::vector<const phi::DenseTensor *> &
   BuildVariantPack(inTensors, outTensors, 0);
 }
 
-virtual void BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
+void PpAscendAtbOpBase::BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
                               std::vector<const phi::DenseTensor *> &outTensors,
                               uint64_t layerId)
 {
@@ -67,7 +67,7 @@ atb::Status PpAscendAtbOpBase::Execute(aclrtStream stream,
                                      std::vector<const phi::DenseTensor *> &inTensors,
                                      std::vector<const phi::DenseTensor *> &outTensors)
 {
-  Setup(stream, inputs, outputs, 0);  
+  Setup(stream, inTensors, outTensors, 0);  
   atb::Status st = Execute(0);
 
   return st;
@@ -158,7 +158,7 @@ void PpAscendAtbOpBase::ThreadProcessTask()
   }
 }
 
-PpAscendAtbOpBase::PpAscendAtbOpBase(const std::string &opName, const std::string &isUsePlanExecuteAsync)
+PpAscendAtbOpBase::PpAscendAtbOpBase(const std::string &opName, const bool &isUsePlanExecuteAsync)
 {
   opName_ = opName;
   variantPacks_.resize(1);

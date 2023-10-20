@@ -24,6 +24,9 @@ std::shared_ptr<PpAtbLlamaDecoderLayerParallelOp> g_llamaDecoderLayerParallelOp;
 static uint64_t executeCount = 0;
 static paddle::Tensor g_attention_mask_tensor;
 
+envString = std::getenv("ATB_OPERATION_EXECUTE_ASYNC");
+static bool g_isDecoderUsePlanExecuteAsync = (envString != nullptr && std::string(envString) == "1") ? true : false;
+
 void PerpareLlamaDecoderLayerInputs(
     const paddle::Tensor &hidden,
     const paddle::Tensor &norm_weight,
@@ -180,7 +183,7 @@ void PpAtbLlamaDecoderLayerParallelOp::UpdateInputTensorAndParam(const paddle::T
 }
 
 PpAtbLlamaDecoderLayerParallelOp::PpAtbLlamaDecoderLayerParallelOp(
-    const std::string &modelName, int32_t layerNum, int32_t batch_size, int maxBatchSize, const phi::CustomContext &dev_ctx) : PpAscendAtbOpBaseAsync(modelName) {
+    const std::string &modelName, int32_t layerNum, int32_t batch_size, int maxBatchSize, const phi::CustomContext &dev_ctx) : PpAscendAtbOpBaseAsync(modelName, g_isDecoderUsePlanExecuteAsync) {
   layerNum_ = layerNum;
   curBatchSize_ = batch_size;
   maxBatchSize_ = maxBatchSize;

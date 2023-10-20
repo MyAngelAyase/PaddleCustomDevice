@@ -26,6 +26,9 @@
 std::shared_ptr<PpAtbLlamaEncoderLayerParallelOp> g_llamaEncoderLayerParallelOp;
 static uint64_t executeCount = 0;
 
+envString = std::getenv("ATB_OPERATION_EXECUTE_ASYNC");
+static bool g_isEncoderUsePlanExecuteAsync = (envString != nullptr && std::string(envString) == "1") ? true : false;
+
 void PerpareLlamaEncoderLayerInputs(
     const paddle::Tensor &hidden,
     const paddle::Tensor &norm_weight,
@@ -161,7 +164,7 @@ void PpAtbLlamaEncoderLayerParallelOp::UpdateInputTensorAndParam(const paddle::T
 }
 
 PpAtbLlamaEncoderLayerParallelOp::PpAtbLlamaEncoderLayerParallelOp(
-    const std::string &modelName, int32_t layerNum, int32_t batchSize, int maxBatchSize) : PpAscendAtbOpBaseAsync(modelName) {
+    const std::string &modelName, int32_t layerNum, int32_t batchSize, int maxBatchSize) : PpAscendAtbOpBaseAsync(modelName, g_isEncoderUsePlanExecuteAsync) {
   layerNum_ = layerNum;
   curBatchSize_ = batchSize;
   maxBatchSize_ = maxBatchSize;

@@ -27,7 +27,8 @@
 
 class PpAscendAtbOpBase {
 public:
-  PpAscendAtbOpBase(const std::string &opName);
+  PpAscendAtbOpBase(const std::string &opName) : PpAscendAtbOpBase(opName, false) {};
+  PpAscendAtbOpBase(const std::string &opName, const bool &isUsePlanExecuteAsync);
   ~PpAscendAtbOpBase();
 
   virtual void BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
@@ -39,6 +40,10 @@ public:
                               std::vector<const phi::DenseTensor *> &inTensors,
                               std::vector<const phi::DenseTensor *> &outTensors);
   virtual atb::Status Execute(uint64_t layerId);
+  virtual atb::Status Setup(aclrtStream stream,
+                            std::vector<const phi::DenseTensor *> &inTensors,
+                            std::vector<const phi::DenseTensor *> &outTensors,
+                            uint64_t layerId);
   void ThreadProcessTask();
   void PushTask(int layerId);
   int PopTask();
