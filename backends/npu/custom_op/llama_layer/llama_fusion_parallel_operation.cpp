@@ -19,7 +19,6 @@
 #include "llama_multi_layer_operation.h"
 #include "llama_mlp_operation.h"
 #include "llama_position_embedding_1d_split_fusion_operation.h"
-#include <memory>
 
 static const uint64_t IN_TENSOR_COUNT = 16;
 static const uint64_t OUT_TENSOR_COUNT = 1;
@@ -68,7 +67,7 @@ atb::Status LlamaLayerFusionParallelOperation(const LlamaLayerFusionParallelPara
 
     atb::infer::ElewiseParam castParam;
     castParam.elewiseType = atb::infer::ElewiseParam::ElewiseType::ELEWISE_CAST;
-    castParam.outTensorType = ACL_FLOAT16;
+    // castParam.outTensorType = ACL_FLOAT16;
     atb::CreateOperation(castParam, &castInNode.operation);
     castInNode.inTensorIds = {IN_COS_SIN_TABLE};
     castInNode.outTensorIds = {INTERNAL_CAST_COS_SIN_TABLE};
@@ -113,7 +112,7 @@ atb::Status LlamaLayerFusionParallelOperation(const LlamaLayerFusionParallelPara
     };
     ropeNode.inTensorReshapeFuncs.at(4) = [=](const atb::Dims &oldShape, atb::Dims &newShape) {
         newShape.dimNum = 1;
-        newShape.dims[0] = oldShape.dims[0] * oldShape.dims[1];
+        newShape.dims[0] = oldShape.dims[0];
     };
     // llamaPositionEmbedding1DSplitFusionParam positionEmbedding1dFusionParam;
     // positionEmbedding1dFusionParam.headNum = param.headNum;
@@ -168,7 +167,7 @@ atb::Status LlamaLayerFusionParallelOperation(const LlamaLayerFusionParallelPara
     atb::infer::SelfAttentionParam selfAttentionKvCacheParam;
     selfAttentionKvCacheParam.headDim = param.headDim;
     selfAttentionKvCacheParam.headNum = param.headNum;
-    selfAttentionKvCacheParam.qScale = param.qkScale;
+    selfAttentionKvCacheParam.qkScale = param.qkScale;
     selfAttentionKvCacheParam.batchRunStatusEnable = param.batchRunStatusEnable;
     atb::CreateOperation(selfAttentionKvCacheParam, &selfAttentionKvCacheNode.operation);
     if (param.batchRunStatusEnable) {
@@ -248,36 +247,35 @@ atb::Status LlamaLayerFusionParallelOperation(const LlamaLayerFusionParallelPara
             // 加速库需要[layer, max_batch_size, max_len, hidden_size], 理论应由transpose完成，但读写都为加速库使用，故直接reshape规避
             newShape.dimNum = 4; // dimNum: 4
             newShape.dims[0] = 1;
-            newShape.dims[1] = oldShape.dims[1];
-            newShape.dims[2] = oldShape.dims[3];
-            newShape.dims[3] = oldShape.dims[2] * oldShape.dims[4];
+            newShape.dims[1] = oldShape.dims[0];
+            newShape.dims[2] = oldShape.dims[2];
+            newShape.dims[3] = oldShape.dims[1] * oldShape.dims[3];
         };
         selfAttentionKvCacheNode.inTensorReshapeFuncs.at(4) = [](const atb::Dims &oldShape, atb::Dims &newShape) {
             // 生成的是[1, max_batch_size, head_num, max_len, head_dim]
             // 加速库需要[layer, max_batch_size, max_len, hidden_size 理论应由transpose完成，但读写都为加速库使用，故直接reshape规避
             newShape.dimNum = 4; // dimNum: 4
             newShape.dims[0] = 1;
-            newShape.dims[1] = oldShape.dims[1];
-            newShape.dims[2] = oldShape.dims[3];
-            newShape.dims[3] = oldShape.dims[2] * oldShape.dims[4];
+            newShape.dims[1] = oldShape.dims[0];
+            newShape.dims[2] = oldShape.dims[2];
+            newShape.dims[3] = oldShape.dims[1] * oldShape.dims[3];
         };
         // attention mask: [bs, 1, max_len, max_len]
         selfAttentionKvCacheNode.inTensorReshapeFuncs.at(5) = [=](const atb::Dims &oldShape, atb::Dims &newShape) {
-            newShape.dimNum = 3; // dimNum: 4
-            newShape.dims[0] = oldShape.dims[0];
-            newShape.dims[1] = oldShape.dims[2];
-            newShape.dims[2] = oldShape.dims[3];
+            newShape.dimNum = 2; // dimNum: 4
+            newShape.dims[0] = oldShape.dims[2];
+            newShape.dims[1] = oldShape.dims[3];
         };
     }
     // kv_seq_len: [bs, 1]
     selfAttentionKvCacheNode.inTensorReshapeFuncs.at(6) = [](const atb::Dims &oldShape, atb::Dims &newShape) {
         newShape.dimNum = 1; // dimNum: 1
-        newShape.dims[0] = oldShape.dims[0] * oldShape.dims[1];
+        newShape.dims[0] = oldShape.dims[0];
     };
     // q_seq_len: [bs, 1]
     selfAttentionKvCacheNode.inTensorReshapeFuncs.at(7) = [](const atb::Dims &oldShape, atb::Dims &newShape) {
         newShape.dimNum = 1; // dimNum: 1
-        newShape.dims[0] = oldShape.dims[0] * oldShape.dims[1];
+        newShape.dims[0] = oldShape.dims[0];
     };
 
     // [1, 1, 512] * [512, 4096] -> [1, 1, 4096]
@@ -315,7 +313,7 @@ atb::Status LlamaLayerFusionParallelOperation(const LlamaLayerFusionParallelPara
     selfNormNode.outTensorIds = {INTERMIDATE_SELFNORMOUT};
 
     LlamaMlpParam llamaMlpParam;
-    llamaMlpParam.transpose = param.transpose;
+    llamaMlpParam.transpose = false;
     CreateLlamaMlpOperation(llamaMlpParam, &mlpNode.operation);
     mlpNode.inTensorIds = {INTERMIDATE_SELFNORMOUT, IN_MLPGATEUPWEIGHT};
     mlpNode.outTensorIds = {INTERMIDATE_MLPOUT};
