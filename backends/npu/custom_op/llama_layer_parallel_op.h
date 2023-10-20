@@ -28,7 +28,7 @@ ccl::CCLComm GetCCLComm(const Place& place, int global_gid);
 
 #define ATB_FLASH_ATTENTION_MAX_SEQ_LEN 1024
 
-class PpAtbLlamaDecoderLayerParallelOp : public PpAscendAtbOpBaseAsync {
+class PpAtbLlamaDecoderLayerParallelOp : public PpAscendAtbOpBase {
 public:
   PpAtbLlamaDecoderLayerParallelOp(const std::string &modelName, int32_t layerNum, int32_t batchSize, int maxBatchSize, const phi::CustomContext &dev_ctx);
   ~PpAtbLlamaDecoderLayerParallelOp();
@@ -56,7 +56,7 @@ private:
   int32_t maxBatchSize_ = 0;
 };
 
-class PpAtbLlamaEncoderLayerParallelOp : public PpAscendAtbOpBaseAsync {
+class PpAtbLlamaEncoderLayerParallelOp : public PpAscendAtbOpBase {
 public:
   PpAtbLlamaEncoderLayerParallelOp(const std::string &modelName, int32_t layerNum, int32_t batchSize, int maxBatchSize);
   ~PpAtbLlamaEncoderLayerParallelOp();

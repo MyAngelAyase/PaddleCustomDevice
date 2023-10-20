@@ -17,21 +17,28 @@
 #include "kernels/funcs/format_utils.h"
 
 void PpAscendAtbOpBase::BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
-                                              std::vector<const phi::DenseTensor *> &outTensors)
+                                         std::vector<const phi::DenseTensor *> &outTensors)
 {
-  variantPacks_.inTensors.resize(inTensors.size());
+  BuildVariantPack(inTensors, outTensors, 0);
+}
+
+virtual void BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
+                              std::vector<const phi::DenseTensor *> &outTensors,
+                              uint64_t layerId)
+{
+  variantPacks_.at(layerId).inTensors.resize(inTensors.size());
   for (size_t i = 0; i < inTensors.size(); i++) {
-    variantPacks_.inTensors.at(i) = ConvertDenseTensorToAtbTensor(*(inTensors.at(i)));
-    if (variantPacks_.inTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
-      variantPacks_.inTensors.at(i).desc.format = ACL_FORMAT_ND;
+    variantPacks_.at(layerId).inTensors.at(i) = ConvertDenseTensorToAtbTensor(*(inTensors.at(i)));
+    if (variantPacks_.at(layerId).inTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
+      variantPacks_.at(layerId).inTensors.at(i).desc.format = ACL_FORMAT_ND;
     }
   }
 
-  variantPacks_.outTensors.resize(outTensors.size());
+  variantPacks_.at(layerId).outTensors.resize(outTensors.size());
   for (size_t i = 0; i < outTensors.size(); i++) {
-    variantPacks_.outTensors.at(i) = ConvertDenseTensorToAtbTensor(*(outTensors.at(i)));
-    if (variantPacks_.outTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
-      variantPacks_.outTensors.at(i).desc.format = ACL_FORMAT_ND;
+    variantPacks_.at(layerId).outTensors.at(i) = ConvertDenseTensorToAtbTensor(*(outTensors.at(i)));
+    if (variantPacks_.at(layerId).outTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
+      variantPacks_.at(layerId).outTensors.at(i).desc.format = ACL_FORMAT_ND;
     }
   }
 }
@@ -60,16 +67,27 @@ atb::Status PpAscendAtbOpBase::Execute(aclrtStream stream,
                                      std::vector<const phi::DenseTensor *> &inTensors,
                                      std::vector<const phi::DenseTensor *> &outTensors)
 {
+  Setup(stream, inputs, outputs, 0);  
+  atb::Status st = Execute(0);
+
+  return st;
+}
+
+atb::Status PpAscendAtbOpBase::Setup(aclrtStream stream,
+                                          std::vector<const phi::DenseTensor *> &inTensors,
+                                          std::vector<const phi::DenseTensor *> &outTensors,
+                                          uint64_t layerId)
+{
   uint64_t workspace_size;
   stream_ = stream;
-  BuildVariantPack(inTensors, outTensors);
+  BuildVariantPack(inTensors, outTensors, layerId);
 
-  if(context_ == nullptr) {
+  if (context_ == nullptr) {
     atb::CreateContext(&context_);
     context_->SetExecuteStream(stream);
   }
 
-  atb::Status st = operation_->Setup(variantPacks_, workspace_size);
+  atb::Status st = operations_.at(layerId)->Setup(variantPacks_.at(layerId), workspace_size);
   PADDLE_ENFORCE_EQ(st,
                     0,
                     phi::errors::External("Atb Layer %s Op Setup failed,"
@@ -78,15 +96,80 @@ atb::Status PpAscendAtbOpBase::Execute(aclrtStream stream,
   if (workspace_size > 0) {
     SetWorkspace(workspace_size);
   }
-
-  st = operation_->Execute(variantPacks_, (uint8_t *)workspace_, workspace_size, context_);
+  if(isUsePlanExecuteAsync_) {
+    PushTask(layerId);
+  }
 
   return st;
 }
 
-PpAscendAtbOpBase::PpAscendAtbOpBase(const std::string &opName)
+atb::Status PpAscendAtbOpBase::Execute(uint64_t layerId)
+{
+  atb::Status st = operations_.at(layerId)->Execute(variantPacks_.at(layerId), (uint8_t *)workspace_, workspaceSize_, context_);
+  PADDLE_ENFORCE_EQ(st,
+                    0,
+                    phi::errors::External("Atb Layer %dth Execute failed,"
+                                          "ret message: %s .", layerId, st));
+
+  return st;
+}
+
+void PpAscendAtbOpBase::PushTask(int layerId)
+{
+  std::unique_lock<std::mutex> lock(mutex_);
+  taskQueue_.push(layerId);
+  lock.unlock();
+  cond_.notify_one();
+}
+
+int PpAscendAtbOpBase::PopTask()
+{
+  std::unique_lock<std::mutex> lock(mutex_);
+  while (taskQueue_.empty()) {
+      cond_.wait(lock);
+  }
+  int layerId = taskQueue_.front();
+  taskQueue_.pop();
+  return layerId;
+}
+
+void PpAscendAtbOpBase::ThreadProcessTask()
+{
+  // ATB_LOG(FATAL) << "PpAscendAtbOpBaseAsync ThreadProcessTask start";
+
+  int ret = aclrtSetDevice(currentDevId_);
+  PADDLE_ENFORCE_EQ(ret,
+                    0,
+                    phi::errors::External("AtbAsync Layer %s Op SetDevice failed,"
+                                          "ret message: %d .", opName_, ret));
+
+  int processTaskCount = 0;
+  while (true) {
+    int layerId = PopTask();
+
+    atb::Status st = Execute(layerId);
+
+    processTaskCount++;
+    if (processTaskCount == layerNum_) {
+        // ATB_LOG(INFO) << "PpAscendAtbOpBaseAsync thread process all layers";
+        processTaskCount = 0;
+        allTaskFinish_ = true;
+    }
+  }
+}
+
+PpAscendAtbOpBase::PpAscendAtbOpBase(const std::string &opName, const std::string &isUsePlanExecuteAsync)
 {
   opName_ = opName;
+  variantPacks_.resize(1);
+  operations_.resize(1);
+  // envString = std::getenv("ATB_OPERATION_EXECUTE_ASYNC");
+  // isUsePlanExecuteAsync_ = (envString != nullptr && std::string(envString) == "1") ? true : false;
+  isUsePlanExecuteAsync_ = isUsePlanExecuteAsync;
+  if (isUsePlanExecuteAsync_) {
+    std::thread thread = std::thread(std::bind(&PpAscendAtbOpBase::ThreadProcessTask, this));
+    taskProcessThread_ = std::move(thread);
+  }
 }
 
 PpAscendAtbOpBase::~PpAscendAtbOpBase() {}
