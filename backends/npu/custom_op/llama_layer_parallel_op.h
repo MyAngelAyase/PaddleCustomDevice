@@ -41,7 +41,8 @@ public:
 
 private:
   void BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
-                        std::vector<const phi::DenseTensor *> &outTensors);
+                        std::vector<const phi::DenseTensor *> &outTensors,
+                        uint64_t layerId);
   void BindHostTensorForUpdateParam(atb::VariantPack &variantPack);
   atb::Tensor CreateBatchStatusAtbHostTensor();
 
@@ -50,7 +51,7 @@ private:
   std::vector<int32_t> q_seq_len_param_;
   std::vector<int32_t> batch_status_param_;
 
-  int32_t layerNum_ = 0;
+  // int32_t layerNum_ = 0;
   int32_t curBatchSize_ = 0;
   int32_t maxBatchSize_ = 0;
 };
@@ -65,7 +66,8 @@ public:
 
 private:
   void BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
-                        std::vector<const phi::DenseTensor *> &outTensors);
+                        std::vector<const phi::DenseTensor *> &outTensors,
+                        uint64_t layerId);
   void BindHostTensorForUpdateParam(atb::VariantPack &variantPack);
   atb::Tensor CreateBatchStatusAtbHostTensor();
 
@@ -74,7 +76,7 @@ private:
   std::vector<int32_t> q_seq_len_param_;
   std::vector<int32_t> batch_status_param_;
 
-  int32_t layerNum_ = 0;
+  // int32_t layerNum_ = 0;
   int32_t curBatchSize_ = 0;
   int32_t maxBatchSize_ = 0;
 };

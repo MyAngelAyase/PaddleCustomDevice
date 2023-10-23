@@ -539,11 +539,11 @@ void PpAtbCommOp::BuildVariantPack(void *send_buf,
                                     size_t count,
                                     C_DataType data_type)
 {
-  variantPacks_.inTensors.resize(1);
-  variantPacks_.inTensors.at(0) = ConvertCDataToAsdTensor(send_buf, count, data_type);
+  variantPacks_.at(0).inTensors.resize(1);
+  variantPacks_.at(0).inTensors.at(0) = ConvertCDataToAsdTensor(send_buf, count, data_type);
 
-  variantPacks_.outTensors.resize(1);
-  variantPacks_.outTensors.at(0) = ConvertCDataToAsdTensor(recv_buf, count, data_type);
+  variantPacks_.at(0).outTensors.resize(1);
+  variantPacks_.at(0).outTensors.at(0) = ConvertCDataToAsdTensor(recv_buf, count, data_type);
 }
 
 atb::Status PpAtbCommOp::Execute(aclrtStream stream, void* send_buf, void* recv_buf, size_t count, C_DataType data_type)
@@ -557,7 +557,7 @@ atb::Status PpAtbCommOp::Execute(aclrtStream stream, void* send_buf, void* recv_
     context_->SetExecuteStream(stream);
   }
 
-  atb::Status st = operation_->Setup(variantPacks_, workspace_size);
+  atb::Status st = operations_.at(0)->Setup(variantPacks_.at(0), workspace_size);
   PADDLE_ENFORCE_EQ(st,
                     0,
                     phi::errors::External("PpAtbCommOp %s Op Setup failed,"
@@ -567,7 +567,7 @@ atb::Status PpAtbCommOp::Execute(aclrtStream stream, void* send_buf, void* recv_
     SetWorkspace(workspace_size);
   }
 
-  st = operation_->Execute(variantPacks_, (uint8_t *)workspace_, workspace_size, context_);
+  st = operations_.at(0)->Execute(variantPacks_.at(0), (uint8_t *)workspace_, workspace_size, context_);
 
   return st;
 }

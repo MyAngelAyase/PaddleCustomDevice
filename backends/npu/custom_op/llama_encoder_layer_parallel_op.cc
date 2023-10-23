@@ -26,6 +26,9 @@
 std::shared_ptr<PpAtbLlamaEncoderLayerParallelOp> g_llamaEncoderLayerParallelOp;
 static uint64_t executeCount = 0;
 
+envString = std::getenv("ATB_OPERATION_EXECUTE_ASYNC");
+static bool g_isEncoderUsePlanExecuteAsync = (envString != nullptr && std::string(envString) == "1") ? true : false;
+
 void PerpareLlamaEncoderLayerInputs(
     const paddle::Tensor &hidden,
     const paddle::Tensor &norm_weight,
@@ -100,38 +103,39 @@ void PpAtbLlamaEncoderLayerParallelOp::BindHostTensorForUpdateParam(atb::Variant
 }
 
 void PpAtbLlamaEncoderLayerParallelOp::BuildVariantPack(std::vector<const phi::DenseTensor *> &inTensors,
-                                                        std::vector<const phi::DenseTensor *> &outTensors)
+                                                        std::vector<const phi::DenseTensor *> &outTensors,
+                                                        uint64_t layerId)
 {
-  variantPacks_.inTensors.resize(inTensors.size() + 1); //补充
+  variantPacks_.at(layerId).inTensors.resize(inTensors.size() + 1); //补充
   for (size_t i = 0; i < inTensors.size(); i++) {
     if(i == 10) { // CACHE_K
-      variantPacks_.inTensors.at(i) = ConvertDenseTensorToAtbTensorK(*(inTensors.at(i)));
-      if (variantPacks_.inTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
-        variantPacks_.inTensors.at(i).desc.format = ACL_FORMAT_ND;
+      variantPacks_.at(layerId).inTensors.at(i) = ConvertDenseTensorToAtbTensorK(*(inTensors.at(i)));
+      if (variantPacks_.at(layerId).inTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
+        variantPacks_.at(layerId).inTensors.at(i).desc.format = ACL_FORMAT_ND;
       }
     }else if(i == 11) {// CACHE_V
-      variantPacks_.inTensors.at(i) = ConvertDenseTensorToAtbTensorV(*(inTensors.at(i)));
-      if (variantPacks_.inTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
-        variantPacks_.inTensors.at(i).desc.format = ACL_FORMAT_ND;
+      variantPacks_.at(layerId).inTensors.at(i) = ConvertDenseTensorToAtbTensorV(*(inTensors.at(i)));
+      if (variantPacks_.at(layerId).inTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
+        variantPacks_.at(layerId).inTensors.at(i).desc.format = ACL_FORMAT_ND;
       }    
     }else{
-      variantPacks_.inTensors.at(i) = ConvertDenseTensorToAtbTensor(*(inTensors.at(i)));
-      if (variantPacks_.inTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
-        variantPacks_.inTensors.at(i).desc.format = ACL_FORMAT_ND;
+      variantPacks_.at(layerId).inTensors.at(i) = ConvertDenseTensorToAtbTensor(*(inTensors.at(i)));
+      if (variantPacks_.at(layerId).inTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
+        variantPacks_.at(layerId).inTensors.at(i).desc.format = ACL_FORMAT_ND;
       }
     }
   }
-  variantPacks_.inTensors.at(inTensors.size()) = CreateBatchStatusAtbHostTensor();
+  variantPacks_.at(layerId).inTensors.at(inTensors.size()) = CreateBatchStatusAtbHostTensor();
 
-  variantPacks_.outTensors.resize(outTensors.size());
+  variantPacks_.at(layerId).outTensors.resize(outTensors.size());
   for (size_t i = 0; i < outTensors.size(); i++) {
-    variantPacks_.outTensors.at(i) = ConvertDenseTensorToAtbTensor(*(outTensors.at(i)));
-    if (variantPacks_.outTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
-      variantPacks_.outTensors.at(i).desc.format = ACL_FORMAT_ND;
+    variantPacks_.at(layerId).outTensors.at(i) = ConvertDenseTensorToAtbTensor(*(outTensors.at(i)));
+    if (variantPacks_.at(layerId).outTensors.at(i).desc.format == ACL_FORMAT_NCHW) {
+      variantPacks_.at(layerId).outTensors.at(i).desc.format = ACL_FORMAT_ND;
     }
   }
   // param需要更新，依赖这种方式
-  BindHostTensorForUpdateParam(variantPacks_);
+  BindHostTensorForUpdateParam(variantPacks_.at(layerId));
 }
 
 void PpAtbLlamaEncoderLayerParallelOp::UpdateInputTensorAndParam(const paddle::Tensor &seq_len)
@@ -160,10 +164,20 @@ void PpAtbLlamaEncoderLayerParallelOp::UpdateInputTensorAndParam(const paddle::T
 }
 
 PpAtbLlamaEncoderLayerParallelOp::PpAtbLlamaEncoderLayerParallelOp(
-    const std::string &modelName, int32_t layerNum, int32_t batchSize, int maxBatchSize) : PpAscendAtbOpBase(modelName) {
+    const std::string &modelName, int32_t layerNum, int32_t batchSize, int maxBatchSize) : PpAscendAtbOpBaseAsync(modelName, g_isEncoderUsePlanExecuteAsync) {
   layerNum_ = layerNum;
   curBatchSize_ = batchSize;
   maxBatchSize_ = maxBatchSize;
+  allTaskFinish_ = false;
+  variantPacks_.resize(layerNum_);
+  operations_.resize(layerNum_);
+
+  /* Init Task Queue */
+  std::thread thread = std::thread(std::bind(&PpAtbLlamaEncoderLayerParallelOp::ThreadProcessTask, this));
+  taskProcessThread_ = std::move(thread);
+
+  std::string device_id_str = getenv("FLAGS_selected_npus");
+  currentDevId_ = stoi(device_id_str);
 }
 
 PpAtbLlamaEncoderLayerParallelOp::~PpAtbLlamaEncoderLayerParallelOp() {}
@@ -205,19 +219,23 @@ std::vector<paddle::Tensor> LlamaEncoderLayerParallelOp(
     int device_id = stoi(device_id_str);
     int nranks = 8;
 
-    atb::Operation *op = nullptr; 
-    LlamaLayerFusionParallelParam param = {rmsNormEps,
-                                           head_num,
-                                           head_dim,
-                                           device_id,
-                                           nranks,
-                                           1.0 / std::sqrt(head_dim), // qkScale
-                                           2,
-                                           true,
-                                           nullptr,
-                                           false}; // encoder also enable dynamic batch
-    LlamaLayerFusionParallelOperation(param, &op);
-    g_llamaEncoderLayerParallelOp->operation_.reset(op);
+    for (int i = 0; i < g_llamaEncoderLayerParallelOp->operations_.size(); i++)
+    {
+      atb::Operation *op = nullptr; 
+      LlamaLayerFusionParallelParam param = {rmsNormEps,
+                                            head_num,
+                                            head_dim,
+                                            device_id,
+                                            nranks,
+                                            1.0 / std::sqrt(head_dim), // qkScale
+                                            2,
+                                            true,
+                                            nullptr,
+                                            false}; // encoder also enable dynamic batch
+      LlamaLayerFusionParallelOperation(param, &op);
+      g_llamaEncoderLayerParallelOp->operations_.at(i).reset(op);
+    }
+
     std::vector<int32_t> layer_id_vec(1, 0);
     custom_kernel::TensorFromVector(*dev_ctx, layer_id_vec,
                                     *dev_ctx, &(g_llamaEncoderLayerParallelOp->layerIdTensor_));
@@ -251,9 +269,16 @@ std::vector<paddle::Tensor> LlamaEncoderLayerParallelOp(
   std::vector<const phi::DenseTensor *> outputs;
   outputs.push_back(layerout_tensor.get());
 
-  g_llamaEncoderLayerParallelOp->Execute(stream, inputs, outputs);
+  g_llamaEncoderLayerParallelOp->Setup(stream, inputs, outputs, executeCount);
 
   executeCount++;
+  if ((executeCount % layer_num == 0))
+  {
+    while (!g_llamaEncoderLayerParallelOp->allTaskFinish_) {} /* 等待最后一个layer execute */
+    PADDLE_ENFORCE_NPU_SUCCESS(aclrtSynchronizeStream(stream));
+    g_llamaEncoderLayerParallelOp->allTaskFinish_ = false;
+    executeCount = 0;
+  }
 
   return {paddle::Tensor(layerout_tensor), cache_key_value};
 }

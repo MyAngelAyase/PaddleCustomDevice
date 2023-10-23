@@ -84,7 +84,7 @@ std::vector<paddle::Tensor> LlamaLmHeadOp(const paddle::Tensor &hidden,
     LlamaLmheadParam param = {rmsNormEps,
                               transpose};
     LlamaLmheadOperation(param, &op);
-    g_llamaLmheadOp->operation_.reset(op);
+    g_llamaLmheadOp->operations_.at(0).reset(op);
   }
 
   g_llamaLmheadOp->Execute(stream, inputs, outputs);
