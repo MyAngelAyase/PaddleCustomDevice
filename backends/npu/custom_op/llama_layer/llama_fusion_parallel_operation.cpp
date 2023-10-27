@@ -50,7 +50,7 @@ atb::Status LlamaLayerFusionParallelOperation(const LlamaLayerFusionParallelPara
     atb::Node &mlpLinearParallelNode   = opGraph.nodes.at(nodeId++);
     atb::Node &mlpResidualAddNode   = opGraph.nodes.at(nodeId++);
 
-    // 全量:[bs, seq_len, hidden_size] 
+    // 全量:[bs, seq_len, hidden_size]  增量:TODO待确认
     atb::infer::RmsNormParam inputNormParam;
     inputNormParam.layerType = atb::infer::RmsNormParam::RmsNormType::RMS_NORM_NORM;
     inputNormParam.normParam.epsilon = param.rmsNormEps;
@@ -67,7 +67,7 @@ atb::Status LlamaLayerFusionParallelOperation(const LlamaLayerFusionParallelPara
 
     atb::infer::ElewiseParam castParam;
     castParam.elewiseType = atb::infer::ElewiseParam::ElewiseType::ELEWISE_CAST;
-    castParam.outTensorType = ACL_FLOAT16;
+    // castParam.outTensorType = ACL_FLOAT16;
     atb::CreateOperation(castParam, &castInNode.operation);
     castInNode.inTensorIds = {IN_COS_SIN_TABLE};
     castInNode.outTensorIds = {INTERNAL_CAST_COS_SIN_TABLE};
@@ -114,6 +114,47 @@ atb::Status LlamaLayerFusionParallelOperation(const LlamaLayerFusionParallelPara
         newShape.dimNum = 1;
         newShape.dims[0] = oldShape.dims[0];
     };
+    // llamaPositionEmbedding1DSplitFusionParam positionEmbedding1dFusionParam;
+    // positionEmbedding1dFusionParam.headNum = param.headNum;
+    // positionEmbedding1dFusionParam.rotaryCoeff = param.rotaryCoeff;
+    // CreateLlamaPositionEmbedding1DSplitFusionOperation(positionEmbedding1dFusionParam, &ropeNode.operation);
+    // ropeNode.inTensorIds = {INTERMIDATE_MIXEDQ, INTERMIDATE_MIXEDK, IN_POSITIONIDS, INTERMIDATE_CASTCOS, INTERMIDATE_CASTSIN, IN_SEQLEN};
+    // ropeNode.outTensorIds = {INTERMIDATE_POSITIONEMBEDQ, INTERMIDATE_POSITIONEMBEDK};
+    // ropeNode.inTensorReshapeFuncs.resize(ropeNode.inTensorIds.size());
+    // ropeNode.inTensorReshapeFuncs.at(0) = [=](const atb::Dims &oldShape, atb::Dims &newShape) {
+    //     newShape.dimNum = 2; // dimNum: 2
+    //     newShape.dims[0] = oldShape.dims[0] * oldShape.dims[1];
+    //     newShape.dims[1] = oldShape.dims[2];
+    // };
+    // ropeNode.inTensorReshapeFuncs.at(1) = [=](const atb::Dims &oldShape, atb::Dims &newShape) {
+    //     newShape.dimNum = 2; // dimNum: 2
+    //     newShape.dims[0] = oldShape.dims[0] * oldShape.dims[1];
+    //     newShape.dims[1] = oldShape.dims[2];
+    // };
+    // ropeNode.inTensorReshapeFuncs.at(3) = [=](const atb::Dims &oldShape, atb::Dims &newShape) {
+    //     newShape.dimNum = 4; // dimNum: 4
+    //     newShape.dims[0] = oldShape.dims[0] * oldShape.dims[1];
+    //     newShape.dims[1] = oldShape.dims[2];
+    //     newShape.dims[2] = oldShape.dims[3];
+    //     newShape.dims[3] = oldShape.dims[4];
+    // };
+    // ropeNode.inTensorReshapeFuncs.at(4) = [=](const atb::Dims &oldShape, atb::Dims &newShape) {
+    //     newShape.dimNum = 4; // dimNum: 4
+    //     newShape.dims[0] = oldShape.dims[0] * oldShape.dims[1];
+    //     newShape.dims[1] = oldShape.dims[2];
+    //     newShape.dims[2] = oldShape.dims[3];
+    //     newShape.dims[3] = oldShape.dims[4];
+    // };
+    // ropeNode.inTensorReshapeFuncs.at(5) = [=](const atb::Dims &oldShape, atb::Dims &newShape) {
+    //     newShape.dimNum = 1; // dimNum: 4
+    //     newShape.dims[0] = oldShape.dims[0] * oldShape.dims[1];
+    // };
+
+    // [2, max_bs, head_num / card_num, max_length, head_dim]
+    // atb::infer::SplitParam splitKVParam = {0, 2};
+    // atb::CreateOperation(splitKVParam, &cacheKVSplitNode.operation);
+    // cacheKVSplitNode.inTensorIds = {IN_CACHE_KV};
+    // cacheKVSplitNode.outTensorIds = {INTERMIDATE_CACHEK, INTERMIDATE_CACHEV};
 
     // output: [bs, seqlen, head_dim * head_num_pre_card]
     // Q:[bs * seq_len, head_dim * head_num_pre_car]
@@ -221,10 +262,9 @@ atb::Status LlamaLayerFusionParallelOperation(const LlamaLayerFusionParallelPara
         };
         // attention mask: [bs, 1, max_len, max_len]
         selfAttentionKvCacheNode.inTensorReshapeFuncs.at(5) = [=](const atb::Dims &oldShape, atb::Dims &newShape) {
-            newShape.dimNum = 3; // dimNum: 4
-            newShape.dims[0] = oldShape.dims[0];
-            newShape.dims[1] = oldShape.dims[2];
-            newShape.dims[2] = oldShape.dims[3];
+            newShape.dimNum = 2; // dimNum: 4
+            newShape.dims[0] = oldShape.dims[2];
+            newShape.dims[1] = oldShape.dims[3];
         };
     }
     // kv_seq_len: [bs, 1]
@@ -240,7 +280,7 @@ atb::Status LlamaLayerFusionParallelOperation(const LlamaLayerFusionParallelPara
 
     // [1, 1, 512] * [512, 4096] -> [1, 1, 4096]
     atb::infer::LinearParallelParam selfOutLinearParallelParam;
-    selfOutLinearParallelParam.transWeight = param.transpose;
+    selfOutLinearParallelParam.transWeight = false;
     selfOutLinearParallelParam.rank = param.rank;
     selfOutLinearParallelParam.rankSize = param.rankSize;
     selfOutLinearParallelParam.rankRoot = 0;
@@ -273,13 +313,13 @@ atb::Status LlamaLayerFusionParallelOperation(const LlamaLayerFusionParallelPara
     selfNormNode.outTensorIds = {INTERMIDATE_SELFNORMOUT};
 
     LlamaMlpParam llamaMlpParam;
-    llamaMlpParam.transpose = false;
+    llamaMlpParam.transpose = true;
     CreateLlamaMlpOperation(llamaMlpParam, &mlpNode.operation);
     mlpNode.inTensorIds = {INTERMIDATE_SELFNORMOUT, IN_MLPGATEUPWEIGHT};
     mlpNode.outTensorIds = {INTERMIDATE_MLPOUT};
 
     atb::infer::LinearParallelParam mlpLinearParallelParam;
-    mlpLinearParallelParam.transWeight = param.transpose;
+    mlpLinearParallelParam.transWeight = false;
     mlpLinearParallelParam.rank = param.rank;
     mlpLinearParallelParam.rankSize = param.rankSize;
     mlpLinearParallelParam.rankRoot = 0;
