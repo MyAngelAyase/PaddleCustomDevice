@@ -67,17 +67,17 @@ void PerpareLlamaBlockAttnSmoothEncoderInputs(
   auto qkv_mix_weight_tensor = static_cast<const phi::DenseTensor *>(qkv_mix_weight.impl().get());
   auto qkv_deq_scale_tensor = static_cast<const phi::DenseTensor *>(qkv_deq_scale.impl().get());
   auto self_out_linear_weight_tensor = static_cast<phi::DenseTensor *>(self_out_linear_weight.impl().get());
-  auto self_out_linear_shift_tensor = static_cast<phi::DenseTensor *>(self_out_linear_shift.impl().get());
-  auto self_out_linear_smooth_tensor = static_cast<phi::DenseTensor *>(self_out_linear_smooth.impl().get());
+  auto self_out_linear_shift_tensor = static_cast<const phi::DenseTensor *>(self_out_linear_shift.impl().get());
+  auto self_out_linear_smooth_tensor = static_cast<const phi::DenseTensor *>(self_out_linear_smooth.impl().get());
   auto self_out_linear_deq_scale_tensor = static_cast<const phi::DenseTensor *>(self_out_linear_deq_scale.impl().get());
   auto self_out_norm_weight_tensor = static_cast<const phi::DenseTensor *>(self_out_norm_weight.impl().get());
   auto self_out_norm_blank_bias_tensor = static_cast<const phi::DenseTensor *>(self_out_norm_blank_bias.impl().get());
   auto mlp_gate_up_weight_tensor = static_cast<phi::DenseTensor *>(mlp_gate_up_weight.impl().get());
-  auto mlp_deq_scale_tensor = static_cast<phi::DenseTensor *>(mlp_deq_scale.impl().get());
+  auto mlp_deq_scale_tensor = static_cast<const phi::DenseTensor *>(mlp_deq_scale.impl().get());
   auto mlp_down_weight_tensor = static_cast<phi::DenseTensor *>(mlp_down_weight.impl().get());
-  auto mlp_down_shift_tensor = static_cast<phi::DenseTensor *>(mlp_down_shift.impl().get());
-  auto mlp_down_smooth_tensor = static_cast<phi::DenseTensor *>(mlp_down_smooth.impl().get());
-  auto mlp_down_deq_scale_tensor = static_cast<phi::DenseTensor *>(mlp_down_deq_scale.impl().get());
+  auto mlp_down_shift_tensor = static_cast<const phi::DenseTensor *>(mlp_down_shift.impl().get());
+  auto mlp_down_smooth_tensor = static_cast<const phi::DenseTensor *>(mlp_down_smooth.impl().get());
+  auto mlp_down_deq_scale_tensor = static_cast<const phi::DenseTensor *>(mlp_down_deq_scale.impl().get());
   auto cos_table_tensor = static_cast<const phi::DenseTensor *>(cos_table.impl().get());
   auto sin_table_tensor = static_cast<const phi::DenseTensor *>(sin_table.impl().get());
   auto attention_mask_tensor = static_cast<const phi::DenseTensor *>(attention_mask.impl().get());
@@ -85,6 +85,10 @@ void PerpareLlamaBlockAttnSmoothEncoderInputs(
   auto cache_value_tensor = static_cast<const phi::DenseTensor *>(cache_value.impl().get());
   auto seq_len_tensor = static_cast<const phi::DenseTensor *>(seq_len.impl().get());
   auto block_tables_tensor = static_cast<const phi::DenseTensor *>(block_tables.impl().get());
+
+  self_out_linear_weight_tensor->Resize({self_out_linear_weight_tensor->dims()[1], self_out_linear_weight_tensor->dims()[0]});
+  mlp_gate_up_weight_tensor->Resize({mlp_gate_up_weight_tensor->dims()[1], mlp_gate_up_weight_tensor->dims()[0]});
+  mlp_down_weight_tensor->Resize({mlp_down_weight_tensor->dims()[1], mlp_down_weight_tensor->dims()[0]});
 
   inputs.push_back(hidden_tensor);
   inputs.push_back(norm_weight_tensor);
@@ -147,23 +151,27 @@ void PerpareLlamaBlockAttnSmoothDecoderInputs(
   auto qkv_mix_weight_tensor = static_cast<const phi::DenseTensor *>(qkv_mix_weight.impl().get());
   auto qkv_deq_scale_tensor = static_cast<const phi::DenseTensor *>(qkv_deq_scale.impl().get());
   auto self_out_linear_weight_tensor = static_cast<phi::DenseTensor *>(self_out_linear_weight.impl().get());
-  auto self_out_linear_shift_tensor = static_cast<phi::DenseTensor *>(self_out_linear_shift.impl().get());
-  auto self_out_linear_smooth_tensor = static_cast<phi::DenseTensor *>(self_out_linear_smooth.impl().get());
+  auto self_out_linear_shift_tensor = static_cast<const phi::DenseTensor *>(self_out_linear_shift.impl().get());
+  auto self_out_linear_smooth_tensor = static_cast<const phi::DenseTensor *>(self_out_linear_smooth.impl().get());
   auto self_out_linear_deq_scale_tensor = static_cast<const phi::DenseTensor *>(self_out_linear_deq_scale.impl().get());
   auto self_out_norm_weight_tensor = static_cast<const phi::DenseTensor *>(self_out_norm_weight.impl().get());
   auto self_out_norm_blank_bias_tensor = static_cast<const phi::DenseTensor *>(self_out_norm_blank_bias.impl().get());
   auto mlp_gate_up_weight_tensor = static_cast<phi::DenseTensor *>(mlp_gate_up_weight.impl().get());
-  auto mlp_deq_scale_tensor = static_cast<phi::DenseTensor *>(mlp_deq_scale.impl().get());
+  auto mlp_deq_scale_tensor = static_cast<const phi::DenseTensor *>(mlp_deq_scale.impl().get());
   auto mlp_down_weight_tensor = static_cast<phi::DenseTensor *>(mlp_down_weight.impl().get());
-  auto mlp_down_shift_tensor = static_cast<phi::DenseTensor *>(mlp_down_shift.impl().get());
-  auto mlp_down_smooth_tensor = static_cast<phi::DenseTensor *>(mlp_down_smooth.impl().get());
-  auto mlp_down_deq_scale_tensor = static_cast<phi::DenseTensor *>(mlp_down_deq_scale.impl().get());
+  auto mlp_down_shift_tensor = static_cast<const phi::DenseTensor *>(mlp_down_shift.impl().get());
+  auto mlp_down_smooth_tensor = static_cast<const phi::DenseTensor *>(mlp_down_smooth.impl().get());
+  auto mlp_down_deq_scale_tensor = static_cast<const phi::DenseTensor *>(mlp_down_deq_scale.impl().get());
   auto cos_table_tensor = static_cast<const phi::DenseTensor *>(cos_table.impl().get());
   auto sin_table_tensor = static_cast<const phi::DenseTensor *>(sin_table.impl().get());
   auto attention_mask_tensor = static_cast<const phi::DenseTensor *>(attention_mask.impl().get());
   auto cache_key_tensor = static_cast<const phi::DenseTensor *>(cache_key.impl().get());
   auto cache_value_tensor = static_cast<const phi::DenseTensor *>(cache_value.impl().get());
   auto block_tables_tensor = static_cast<const phi::DenseTensor *>(block_tables.impl().get());
+
+  self_out_linear_weight_tensor->Resize({self_out_linear_weight_tensor->dims()[1], self_out_linear_weight_tensor->dims()[0]});
+  mlp_gate_up_weight_tensor->Resize({mlp_gate_up_weight_tensor->dims()[1], mlp_gate_up_weight_tensor->dims()[0]});
+  mlp_down_weight_tensor->Resize({mlp_down_weight_tensor->dims()[1], mlp_down_weight_tensor->dims()[0]});
 
   inputs.push_back(hidden_tensor);
   inputs.push_back(norm_weight_tensor);
@@ -232,7 +240,7 @@ void InitAtbLlamaBlockAttnSmoothLayerOp(std::shared_ptr<PpAtbLlamaBlockAttnLayer
                                          nranks,
                                          1.0 / std::sqrt(head_dim), // qkScale
                                          2, // rotaryCoeff
-                                         true,
+                                         false,
                                          comm,
                                          g_isEncoder, // isPrefill
                                          selfRmsNormScale,
