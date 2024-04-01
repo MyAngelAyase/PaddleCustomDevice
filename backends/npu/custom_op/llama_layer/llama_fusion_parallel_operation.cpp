@@ -220,8 +220,8 @@ atb::Status LlamaLayerFusionParallelOperation(const LlamaLayerFusionParallelPara
     selfOutLinearParallelParam.rank = param.rank;
     selfOutLinearParallelParam.rankSize = param.rankSize;
     selfOutLinearParallelParam.rankRoot = 0;
-    selfOutLinearParallelParam.bias = "None";
-    selfOutLinearParallelParam.parallelType = "RowParallel";
+    // selfOutLinearParallelParam.bias = "None";
+    // selfOutLinearParallelParam.parallelType = "RowParallel";
     selfOutLinearParallelParam.backend = "lccl";
     selfOutLinearParallelParam.hcclComm = param.hcclComm;
     atb::CreateOperation(selfOutLinearParallelParam, &selfOutLinearParallelNode.operation);
@@ -259,8 +259,8 @@ atb::Status LlamaLayerFusionParallelOperation(const LlamaLayerFusionParallelPara
     mlpLinearParallelParam.rank = param.rank;
     mlpLinearParallelParam.rankSize = param.rankSize;
     mlpLinearParallelParam.rankRoot = 0;
-    mlpLinearParallelParam.bias = "None";
-    mlpLinearParallelParam.parallelType = "RowParallel";
+    // mlpLinearParallelParam.bias = "None";
+    // mlpLinearParallelParam.parallelType = "RowParallel";
     mlpLinearParallelParam.backend = "lccl";
     mlpLinearParallelParam.hcclComm = param.hcclComm;
     atb::CreateOperation(mlpLinearParallelParam, &mlpLinearParallelNode.operation);
