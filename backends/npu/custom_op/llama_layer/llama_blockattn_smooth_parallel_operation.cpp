@@ -82,7 +82,7 @@ atb::Status LlamaBlockAttnSmoothParallelOperation(const LlamaBlockAttnSmoothPara
 
     // [bs, seq_len, hidden_size] * [3 * hidden_size / card_num, hidden_size] -> [bs，seq_len, hidden_size / card_num]
     MultiLayerLinearQuantParam multiLayerLinearQuantParam;
-    multiLayerLinearQuantParam.transpose = param.transpose;
+    multiLayerLinearQuantParam.transpose = !param.transpose;
     CreateLlamaMultiLayerLinearQuantOperation(multiLayerLinearQuantParam, &mixdQKVLinearNode.operation);
     mixdQKVLinearNode.inTensorIds = {INTERMIDATE_INPUTNORMOUT_SMOOTH, IN_QKVMIXDWEIGHT_SMOOTH, IN_QKVDEQSCALE_SMOOTH};
     mixdQKVLinearNode.outTensorIds = {INTERMIDATE_MIXEDQ_SMOOTH, INTERMIDATE_MIXEDK_SMOOTH, INTERMIDATE_MIXEDV_SMOOTH};
@@ -206,7 +206,7 @@ atb::Status LlamaBlockAttnSmoothParallelOperation(const LlamaBlockAttnSmoothPara
 
     // [1, 1, 512] * [512, 4096] -> [1, 1, 4096]
     llamaLinearQuantParallelParam selfOutLinearParallelParam;
-    selfOutLinearParallelParam.transWeight = false;
+    selfOutLinearParallelParam.transWeight = param.transpose;
     selfOutLinearParallelParam.rank = param.rank;
     selfOutLinearParallelParam.rankSize = param.rankSize;
     selfOutLinearParallelParam.rankRoot = 0;
@@ -234,7 +234,7 @@ atb::Status LlamaBlockAttnSmoothParallelOperation(const LlamaBlockAttnSmoothPara
     selfNormNode.outTensorIds = {INTERMIDATE_SELFNORMOUT_SMOOTH};
 
     LlamaMlpDequantParam llamaMlpDequantParam;
-    llamaMlpDequantParam.transpose = true;
+    llamaMlpDequantParam.transpose = param.transpose;
     CreateLlamaMlpDequantOperation(llamaMlpDequantParam, &mlpNode.operation);
     mlpNode.inTensorIds = {INTERMIDATE_SELFNORMOUT_SMOOTH, IN_MLPGATEUPWEIGHT_SMOOTH, IN_MLPDEQSCALE_SMOOTH};
     mlpNode.outTensorIds = {INTERMIDATE_MLPOUT_SMOOTH};
@@ -254,7 +254,7 @@ atb::Status LlamaBlockAttnSmoothParallelOperation(const LlamaBlockAttnSmoothPara
     mlpQuantNode.outTensorIds = {INTERMIDATE_MLPOUT_QUANT_SMOOTH};
 
     llamaLinearQuantParallelParam mlpLinearParallelParam;
-    mlpLinearParallelParam.transWeight = false;
+    mlpLinearParallelParam.transWeight = param.transpose;
     mlpLinearParallelParam.rank = param.rank;
     mlpLinearParallelParam.rankSize = param.rankSize;
     mlpLinearParallelParam.rankRoot = 0;

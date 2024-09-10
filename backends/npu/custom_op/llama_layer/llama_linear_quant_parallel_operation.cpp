@@ -47,7 +47,7 @@ atb::Status CreateLlamaLinearQuantParallelOperation(const llamaLinearQuantParall
     atb::infer::LinearParam linearQuantParam;
     linearQuantParam.outDataType = ACL_FLOAT16;
     linearQuantParam.transposeA = false;
-    linearQuantParam.transposeB = !param.transWeight;
+    linearQuantParam.transposeB = param.transWeight;
     linearQuantParam.hasBias = false;
     CreateOperation(linearQuantParam, &linearQuantNode.operation);
     linearQuantNode.inTensorIds = {IN_INPUT, IN_WEIGHT, IN_DEQSCALE};
@@ -73,7 +73,7 @@ atb::Status CreateLlamaLinearQuantParallelOperation(const llamaLinearQuantParall
         outTensorDescs.at(0).format = inTensorDescs.at(0).format;
         outTensorDescs.at(0).shape = inTensorDescs.at(0).shape;
         auto outDimSize = outTensorDescs.at(0).shape.dimNum;
-        if (!param.transWeight) {
+        if (param.transWeight) {
             outTensorDescs.at(0).shape.dims[outDimSize - 1] = inTensorDescs.at(1).shape.dims[0];
         } else {
             outTensorDescs.at(0).shape.dims[outDimSize - 1] = inTensorDescs.at(1).shape.dims[1];
